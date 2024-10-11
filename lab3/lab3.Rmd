@@ -1,0 +1,72 @@
+```{r}
+# install.packages('dplyr')
+library(dplyr)
+```
+
+```{r}
+customers = read.csv('Customers.csv', sep=';')
+```
+
+```{r}
+head(customers)
+customers
+```
+
+```{r}
+customers = customers %>% select(-customer_id)
+customers$gender = as.numeric(as.character(factor(customers$gender, levels=c('Male', 'Female'), labels = c('1', '0'))))
+
+head(customers)
+```
+
+```{r}
+tot.withinss <- vector(mode="character", length=10)
+for (i in 1:10){
+ customers_cluster <- kmeans(customers, center=i, nstart=20)
+ tot.withinss[i] <- customers_cluster$tot.withinss
+}
+plot(1:10, tot.withinss, type="b", pch=19)
+```
+
+```{r}
+N_CLUSTERS = 3
+```
+
+```{r}
+set.seed(42);
+customers_cluster = kmeans(customers, center=N_CLUSTERS)
+plot(
+  x=customers$age,
+  y=customers$spending_score,
+  col=customers_cluster$cluster,
+  pch=customers_cluster$cluster
+)
+points(
+  x=customers_cluster$centers[,'age'],
+  y=customers_cluster$centers[,'spending_score'],
+  pch=5,
+  lwd=5,
+  col='red'
+)
+```
+
+```{r}
+distance = dist(customers)
+hclusters <- hclust(distance, method = "average")
+```
+
+```{r}
+plot(x = hclusters)
+rect.hclust(hclusters, k=3, border = 2:4)
+```
+
+```{r}
+cuts <- cutree(tree = hclusters, k = 3)
+plot(
+  x=customers$age,
+  y=customers$spending_score,
+  col=cuts+1,
+  pch=cuts 
+)
+
+```

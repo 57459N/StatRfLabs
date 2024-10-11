@@ -1,0 +1,103 @@
+```{r}
+# install.packages('caret');
+# install.packages('tree')
+library(caret)
+library(tree)
+library(RColorBrewer)
+```
+
+```{r}
+risk <- read.csv('Risk.csv')
+
+print(head(risk, n=5))
+
+palette = brewer.pal(3, "Set2")
+
+
+risk$Gender <- factor(risk$Gender)
+risk$State <- factor(risk$State)
+risk$Risk <- factor(risk$Risk)
+
+```
+
+```{r}
+plot(
+  x = risk[1:7], 
+  col = palette[as.numeric(risk$Risk)])
+
+```
+
+```{r}
+plot(
+  x=risk$BMI,
+  y=risk$Age,
+  col=palette[as.numeric(risk$Risk)],
+)
+```
+
+```{r}
+
+```
+
+```{r}
+
+set.seed(42) # Setting up random seed to 42. Start value to generate pseudo-random numbers
+train_idxs = createDataPartition(risk$Risk, p=0.8, list=FALSE)
+train_part = risk[train_idxs,]
+test_part = risk[-train_idxs,]
+nrow(train_part)
+nrow(test_part)
+```
+
+```{r}
+knn_model = knn3(
+  formula = Risk~Age+BMI+Gender+State.Rate,
+  data = train_part,
+  k = 3 
+)
+```
+
+```{r}
+preds = predict(
+  object=knn_model,
+  newdata=test_part,
+  type='class'
+)
+ta = table(
+  x = preds,
+  y = test_part$Risk
+)
+tab = table(x=preds, y=test_part$Risk)
+confusionMatrix(tab, mode='prec_recall')
+```
+
+```{r}
+tree_model = tree(
+  formula = Risk ~ Age + BMI + Gender + State.Rate,
+  data = train_part
+)
+summary(tree_model)
+plot(tree_model)
+text(tree_model)
+
+tree_model_snip = snip.tree(tree_model, nodes=c(6, 12))
+
+plot(
+ x = risk$BMI, 
+ y = risk$Age,
+ col = palette[as.numeric(risk$Risk)],
+ main = "Age (BMI)",
+ xlab = "BMI",
+ ylab = "Age"
+)
+partition.tree(
+ tree = tree_model_snip,
+ label = "Risk",
+ add = TRUE
+)
+```
+
+```{r}
+
+
+```
