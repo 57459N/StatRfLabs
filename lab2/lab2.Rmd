@@ -1,10 +1,18 @@
 ```{r}
 # install.packages('caret');
 # install.packages('tree')
-library(caret)
-library(tree)
-library(RColorBrewer)
+# install.packages('NeuralNetTools')
+library(caret);
+library(tree);
+library(RColorBrewer);
+library(nnet);
+library(NeuralNetTools);
+library(stringr);
 ```
+
+# Датасет
+
+### Загрузка датасета
 
 ```{r}
 risk <- read.csv('Risk.csv')
@@ -19,6 +27,8 @@ risk$State <- factor(risk$State)
 risk$Risk <- factor(risk$Risk)
 
 ```
+
+### Матрицы рассеяности
 
 ```{r}
 plot(
@@ -37,23 +47,49 @@ plot(
 
 ```{r}
 
-```
-
-```{r}
-
-set.seed(42) # Setting up random seed to 42. Start value to generate pseudo-random numbers
+set.seed(42)
 train_idxs = createDataPartition(risk$Risk, p=0.8, list=FALSE)
 train_part = risk[train_idxs,]
 test_part = risk[-train_idxs,]
-nrow(train_part)
-nrow(test_part)
+str_interp('Количесво строк: ${nrow(train_part)}')
+str_interp('Количесво стобцов: ${nrow(test_part)}')
+
+```
+
+# К ближайших соседей
+
+## Выбор числа кластеров
+
+```{r}
+tot.withinss <- vector(mode="character", length=10)
+for (i in 1:10){
+  set.seed(42);
+  knn_model = knn3(
+  formula = Risk~Age+BMI+Gender+State.Rate,
+  data = train_part,
+  k = i 
+  )
+  preds = predict(
+    object=knn_model,
+    newdata=test_part,
+    type='class'
+  )
+  ta = table(
+    x = preds,
+    y = test_part$Risk
+  )
+  tab = table(x=preds, y=test_part$Risk)
+  knn_conf = confusionMatrix(tab, mode='prec_recall');
+  tot.withinss[i] = knn_conf$overall[1]
+}
+plot(1:10, tot.withinss, type="b", pch=19)
 ```
 
 ```{r}
 knn_model = knn3(
   formula = Risk~Age+BMI+Gender+State.Rate,
   data = train_part,
-  k = 3 
+  k = 4
 )
 ```
 
@@ -68,8 +104,11 @@ ta = table(
   y = test_part$Risk
 )
 tab = table(x=preds, y=test_part$Risk)
-confusionMatrix(tab, mode='prec_recall')
+knn_conf = confusionMatrix(tab, mode='prec_recall');
+knn_conf
 ```
+
+# Дерево
 
 ```{r}
 tree_model = tree(
@@ -80,24 +119,80 @@ summary(tree_model)
 plot(tree_model)
 text(tree_model)
 
-tree_model_snip = snip.tree(tree_model, nodes=c(6, 12))
+tree_preds = predict(
+ object = tree_model,
+ newdata = test_part[, c(1, 3, 6, 7)],
+ type = "class")
+tree_conf = confusionMatrix(
+ data = as.factor(tree_preds),
+ reference = test_part$Risk,
+ mode='prec_recall');
+tree_conf
+```
 
-plot(
- x = risk$BMI, 
- y = risk$Age,
- col = palette[as.numeric(risk$Risk)],
- main = "Age (BMI)",
- xlab = "BMI",
- ylab = "Age"
-)
-partition.tree(
- tree = tree_model_snip,
- label = "Risk",
- add = TRUE
-)
+# Нейронная сеть
+
+```{r}
+nn_model <- nnet(
+ formula = Risk ~ Age + BMI + Gender + State.Rate,
+ data = train_part,
+ size = 8,
+ decay = 1e-5,
+ maxit = 500)
+```
+
+### Визуализация архитектуры
+
+```{r}
+plotnet(nn_model, alpha=0.5)
 ```
 
 ```{r}
-
-
+head(test_part, n=1)
 ```
+
+### Обучение нейронной сети
+
+```{r}
+nn_preds = predict(
+ object = nn_model,
+ newdata = test_part[, c(7, 6, 3, 1)],
+ type = "class")
+nn_conf = confusionMatrix(
+ data = as.factor(nn_preds),
+ reference = test_part$Risk,
+ mode='prec_recall');
+print(nn_conf)
+```
+
+# Kappa всех моделей
+
+```{r}
+library(stringr)
+
+str_interp('KNN ${knn_conf$overall[2]}')
+str_interp('Tree ${tree_conf$overall[2]}')
+str_interp('NN ${nn_conf$overall[2]}')
+```
+
+# Вопросы
+
+### 1. Объяснить, для чего используется функция `set.seed(42)` в работе.
+
+Данная функция используется для установки начального числа (сида) для генерации псевдо-случайных чисел. Это необходимо для того, чтобы при использовании этих чисел моделями они каждый раз были одинаковыми, и результат работы был воспроизводим. `42` - потому, что это ответ на все вопросы.
+
+### 2. Объяснить выбранное количесво соседей в методе К ближайших соседей.
+
+В пункте `Выбор числа кластеров` было построено 10 моделей с различными количествами клстеров и наилучшим их числом стало 4.
+
+### 3. Какова точность модели `К ближайших соседей`?
+
+Accuracy модели составило `r sprintf("%0.4f", knn_conf$overal[1])`.
+
+### 4. Какова точносто медели `Дерево`?
+
+Accuracy модели составило `r sprintf("%0.4f", tree_conf$overal[1])`.
+
+### 4. Какова точность `нейросетевой` модели?
+
+Accuracy модели составило `r sprintf("%0.4f", nn_conf$overal[1])`.
